@@ -9,14 +9,28 @@ from .sound_audio import audio_code
 from .sound_ui import ui_code
 
 
-def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17):
+def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=False, aspect_trace=False, aspect_border=False, aspect_border_diagnostic=False, aspect_border_lease=False, aspect_mask=False, aspect_mask_trial=False, precapture_probe=False, lut_sd=False, lut_cube_text=None, lut_size=17, desqueeze_probe=False, desqueeze=False, playback_probe=False, capture_probe=False):
+    if capture_probe and (playback_probe or desqueeze or desqueeze_probe or wireless or bitrate or precapture_probe or lut_sd or aspect):
+        raise ValueError('Capture probe needs the independent experimental page slot and stock geometry')
+    if playback_probe and (desqueeze or desqueeze_probe or wireless or bitrate or precapture_probe or lut_sd):
+        raise ValueError('Playback probe needs the independent experimental page slot')
+    if playback_probe and aspect:
+        raise ValueError('Playback probe observes stock geometry; build it without aspect-profiles')
+    if desqueeze and (desqueeze_probe or wireless or bitrate or precapture_probe or lut_sd):
+        raise ValueError('Desqueeze trial needs the independent experimental page slot')
+    if desqueeze and aspect:
+        raise ValueError('Desqueeze trial is not yet validated together with aspect-profiles')
+    if desqueeze_probe and (wireless or bitrate or precapture_probe or lut_sd):
+        raise ValueError('Desqueeze probe needs the independent experimental page slot')
+    if desqueeze_probe and aspect:
+        raise ValueError('Desqueeze probe observes stock display geometry; build it without aspect-profiles')
     if lut_sd and (wireless or bitrate or precapture_probe):
         raise ValueError('SD LUT research menu requires the independent experimental page slot')
     if precapture_probe and (wireless or bitrate):
         raise ValueError('JPG capture probe needs the independent experimental page slot')
     if wireless and bitrate:
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
-    bitrate = bitrate or wireless or precapture_probe or lut_sd
+    bitrate = bitrate or wireless or precapture_probe or lut_sd or desqueeze_probe or desqueeze or playback_probe or capture_probe
     im = plan.image
     if im.read(STATE_ANCHOR, 44) != bytes(44):
         raise ValueError('Sound state requires the unused stock page-zero slot')
@@ -88,6 +102,14 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
     if bitrate:
         if lut_sd:
             from . import lut_ui as bu
+        elif desqueeze_probe:
+            from . import desqueeze_probe as bu
+        elif desqueeze:
+            from . import desqueeze_ui as bu
+        elif playback_probe:
+            from . import playback_probe as bu
+        elif capture_probe:
+            from . import capture_probe as bu
         elif precapture_probe:
             from . import precapture_probe as bu
         elif wireless:
@@ -282,10 +304,12 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         root = page_specs[0]
         page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[3],))
         # Wireless research uses four choices, while the video selector has three.
-        choice_count = 4 if wireless or lut_sd else 3
-        if wireless or lut_sd:
+        choice_count = len(bu.ROW_LABELS) if desqueeze else 4 if wireless or lut_sd else 3
+        if wireless or lut_sd or desqueeze:
             occupied = used | {ident for spec in page_specs for ident in spec[-1]}
-            choices = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:4]
+            choices = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:choice_count]
+            if len(choices) != choice_count:
+                raise ValueError('No free experimental page control IDs')
         else:
             choices = ids[:3]
         page_specs.append((bu.PAGE_INDEX,choice_count,bu.LABEL_SLOT,bu.MARK_SLOT,bu.TITLE_SLOT,choices))

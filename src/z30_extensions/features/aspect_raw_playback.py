@@ -20,7 +20,7 @@ PACK_CALLERS = (0x103473EF, 0x10347409, 0x10347463,
                 0x103474A3, 0x1034750D, 0x10347579)
 
 
-def install(plan, functions, codes, sizes, profiles):
+def install(plan, functions, codes, sizes, profiles, file_types=(1, 2), extra_shapes=()):
     names = {'raw_preview_query': 512, 'raw_preview_pack': 384,
              'raw_preview_standard': 256, 'raw_preview_extended': 256,
              'raw_preview_standard_original': 96, 'raw_preview_extended_original': 96}
@@ -31,19 +31,25 @@ def install(plan, functions, codes, sizes, profiles):
     # NEF may describe the padded RAW plane rather than the visible JPEG.
     # The XPAN sample has 5600x2072 in its RAW IFD and 5568x2056 in JPEG SOF.
     shapes.update((p['jpeg_wh'][0][0]+32, p['jpeg_wh'][0][1]+16) for p in profiles)
+    shapes.update(tuple(wh) for wh in extra_shapes)
     shapes = sorted(shapes)
     shape_table = plan.alloc(b''.join(struct.pack('<2H', *wh) for wh in shapes))
 
     def callers(values, register='lr'):
         return ''.join(c('r5', value) + f'cmp {register},r5;beq allowed;' for value in values)
 
+    # Native still types share the 0x103A1FA8 query (types 0-2; 4/5 are
+    # movies). The default keeps the camera-verified aspect gate byte-exact.
+    if not file_types or any(t not in (0, 1, 2) for t in file_types):
+        raise ValueError('Per-file preview query supports still file types 0-2 only')
+    type_gate = ''.join(f'cmp r7,#{t};beq format;' for t in file_types[:-1]) + f'cmp r7,#{file_types[-1]};bne bad;'
     # r0 = native file object, r1 = native stream kind (4 small, 5 large).
     # Main dimensions only gate the custom-photo path. Actual preview sizes
     # come from the native file service; old custom photos with stock previews
     # must retain their own 640x360 / 1920x1080 dimensions.
     codes['raw_preview_query'] = f'''push {{r4-r8,lr}};sub sp,#8;
         mov r4,r0;mov r6,r1;cmp r6,#4;beq kind;cmp r6,#5;bne bad;
-        kind:ldrb r7,[r4,#4];cmp r7,#1;beq format;cmp r7,#2;bne bad;
+        kind:ldrb r7,[r4,#4];{type_gate}
         format:ldr r0,[r4,#12];cmp r0,#0;beq bad;
         ldrh.w r1,[r0,#0x398];ldrh.w r2,[r0,#0x39a];
         {c('r3', shape_table)}movs r8,#{len(shapes)};
@@ -93,7 +99,7 @@ def install(plan, functions, codes, sizes, profiles):
     plan.edit(PACK_SITE, jump(PACK_SITE, functions['raw_preview_pack'], 10),
               'Per-file custom NEF decoded preview descriptor', bytes.fromhex('70b50df1100c9ce87000'))
     return dict(version=1, query_service='0x103a1fa8',
-                file_types=[1, 2], file_shapes=[list(wh) for wh in shapes],
+                file_types=list(file_types), file_shapes=[list(wh) for wh in shapes],
                 dimension_callers=[hex(v) for _, values in DIMENSION_SITES.values() for v in values],
                 descriptor_callers=[hex(v) for v in PACK_CALLERS],
                 uses_current_shooting_profile=False, writes_photo=False,
