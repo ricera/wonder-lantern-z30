@@ -28,6 +28,11 @@ def verify(stock,image,report):
         audio.setnchannels(1);audio.setsampwidth(2);audio.setframerate(8000);audio.writeframes(b'\x01\0'*80)
     files={'A:\\SHUTTER.WAV':stream.getvalue()}
     fixture=Fixture(stock,image,report,files,properties={})
+    if 'desqueeze' in report['features']:
+        # Desqueeze keeps its factor in native persistent settings RAM
+        # (0xC25254EE); model the page as factory zeros (OFF).
+        from z30_extensions.features.desqueeze_ui import NV_GROUP_RAM
+        fixture.map(NV_GROUP_RAM & ~0xFFF,0x1000)
     pages={int(k):fixture.state+v for k,v in sound['page_offsets'].items()}
     nav=[];focus=[]
     def boundary(u,address,size,data):
@@ -51,7 +56,7 @@ def verify(stock,image,report):
         assert fixture.call(functions['getter'],(2,index))==pointer
         assert int.from_bytes(fixture.u.mem_read(pointer+2,2),'little')==index
     categories=sound['menu_categories']
-    expected=[key for key,feature in (('aspect','aspect_profiles'),('zebra','photo_zebra_control'),('bitrate','bitrate_profiles'),
+    expected=[key for key,feature in (('aspect','aspect_profiles'),('desqueeze','desqueeze'),('zebra','photo_zebra_control'),('bitrate','bitrate_profiles'),
                                      ('sound','shutter_sound'),('modules','module_host'))
               if feature in report['features']]
     if len(expected)==1:expected=[]

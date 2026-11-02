@@ -32,6 +32,20 @@ class PresetTests(unittest.TestCase):
         self.assertEqual(resolve_presets('aspect-profiles')[1], ['shutter-sound', 'aspect-profiles'])
         self.assertEqual(resolve_presets(['aspect-profiles','full'])[1],
                          resolve_presets('full')[1])
+    def test_anamorphic_desqueeze_is_opt_in_and_refuses_aspect_profiles(self):
+        from z30_extensions.build import build, FULL_FEATURES
+        self.assertIn('anamorphic-desqueeze', PRESETS)
+        self.assertNotIn('anamorphic-desqueeze', FULL_FEATURES)
+        self.assertNotIn('anamorphic-desqueeze', resolve_presets('full')[1])
+        self.assertEqual(resolve_presets('anamorphic-desqueeze')[1], ['shutter-sound', 'anamorphic-desqueeze'])
+        self.assertEqual(resolve_presets(['anamorphic-desqueeze', 'photo-zebra', 'anamorphic-desqueeze'])[1],
+                         ['shutter-sound', 'photo-zebra', 'anamorphic-desqueeze'])
+        for selection in (['anamorphic-desqueeze', 'aspect-profiles'], ['anamorphic-desqueeze', 'full']):
+            with self.subTest(selection=selection), self.assertRaisesRegex(ValueError, 'aspect-profiles'):
+                build(b'', selection)  # Refused before the source is read.
+        with patch('builtins.input', return_value='12'), patch('sys.stdout', new=io.StringIO()):
+            self.assertEqual(choose_presets(), ['anamorphic-desqueeze'])
+
     def test_module_host_selection_builds_its_required_framework(self):
         self.assertEqual(PRESETS[5], 'module-host')
         self.assertNotIn('modular', PRESETS)

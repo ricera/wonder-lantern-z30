@@ -6,12 +6,24 @@ from z30_extensions.features import aspect_ui
 
 class DesqueezeUiLayoutTests(unittest.TestCase):
     def test_text_slots_do_not_overlap(self):
+        from z30_extensions.features import bitrate_ui, zebra_ui, module_host, sound_layout
         n = len(du.ROW_LABELS)
         labels = set(range(du.LABEL_SLOT, du.LABEL_SLOT + n))
         marks = set(range(du.MARK_SLOT, du.MARK_SLOT + n))
         fixed = {du.TITLE_SLOT, du.ROOT_SLOT, du.CURRENT_SLOT}
+        mine = labels | marks | fixed
         self.assertFalse(labels & marks or labels & fixed or marks & fixed)
-        self.assertLess(max(labels | marks | fixed), aspect_ui.TITLE_SLOT)
+        others = (set(range(40, 57))                                      # root / sound pages
+                  | set(range(module_host.TITLE_SLOT - 1, module_host.STATUS_SLOT + 1))
+                  | set(range(bitrate_ui.TITLE_SLOT, aspect_ui.TITLE_SLOT))  # experimental page 960
+                  | set(range(aspect_ui.TITLE_SLOT, aspect_ui.CURRENT_SLOT + 1))
+                  | {sound_layout.SOUND_GROUP_TITLE_SLOT}
+                  | set(range(zebra_ui.TITLE_SLOT, zebra_ui.CURRENT_SLOT + 1)))
+        self.assertFalse(mine & others, sorted(mine & others))
+        pages = {bitrate_ui.PAGE_INDEX, aspect_ui.PAGE_INDEX, zebra_ui.PAGE_INDEX,
+                 module_host.PAGE_INDEX, sound_layout.SOUND_GROUP_INDEX, sound_layout.PAGE_INDEX,
+                 sound_layout.FILES_INDEX, sound_layout.SWITCH_INDEX, sound_layout.POPUP_INDEX}
+        self.assertNotIn(du.PAGE_INDEX, pages)
 
     def test_factors_match_names_and_widen(self):
         self.assertEqual(len(du.FACTORS) + 1, len(du.NAMES))

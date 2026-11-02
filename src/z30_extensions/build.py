@@ -6,11 +6,12 @@ from .platform.z30_120 import BASE
 
 
 PRESETS = ('full', 'liveview-dual', 'shutter-sound', 'm900', 'mtp-fast', 'module-host', 'video-rot',
-           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz')
+           'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'anamorphic-desqueeze')
 LEGACY_PRESETS = ('modular',)
 FEATURE_ORDER = ('liveview-dual', 'm900', 'shutter-sound', 'mtp-fast', 'module-host', 'video-rot',
-                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz')
-FULL_FEATURES = FEATURE_ORDER
+                 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra', 'wifi-5ghz', 'anamorphic-desqueeze')
+# Anamorphic desqueeze is opt-in and not yet composed with aspect-profiles.
+FULL_FEATURES = tuple(f for f in FEATURE_ORDER if f != 'anamorphic-desqueeze')
 MODULAR_FEATURES = ('liveview-dual', 'm900', 'shutter-sound', 'module-host')
 
 
@@ -30,7 +31,8 @@ def resolve_presets(preset='full'):
         else:
             features.add(name)
     # Module host and bitrate profiles share the sound menu/state framework.
-    if any(f in features for f in ('module-host', 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra')):
+    if any(f in features for f in ('module-host', 'bitrate-slowmo-uncap', 'aspect-profiles', 'photo-zebra',
+                                   'anamorphic-desqueeze')):
         features.add('shutter-sound')
     return list(dict.fromkeys(selected)), [f for f in FEATURE_ORDER if f in features]
 
@@ -39,6 +41,9 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
           aspect_border_diagnostic=False, aspect_border_lease=False,
           aspect_mask=None, aspect_mask_trial=False):
     selected, features = resolve_presets(preset)
+    if 'anamorphic-desqueeze' in features and 'aspect-profiles' in features:
+        raise ValueError('anamorphic-desqueeze cannot yet be combined with aspect-profiles (also part of full); '
+                         'see docs/desqueeze-aspect-compatibility.md')
     # Photo aspect and its live-view mask are one public preset. Historical
     # border/static-mask experiments keep their own explicitly selected path;
     # researchers may still pass False for a no-mask comparison build.
@@ -78,7 +83,8 @@ def build(source, preset='full', *, aspect_trace=False, aspect_border=False,
         add(plan, modules='module-host' in features, bitrate='bitrate-slowmo-uncap' in features,
             zebra='photo-zebra' in features, aspect='aspect-profiles' in features, aspect_trace=aspect_trace, aspect_border=aspect_border,
             aspect_border_diagnostic=aspect_border_diagnostic,aspect_border_lease=aspect_border_lease,
-            aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial)
+            aspect_mask=aspect_mask, aspect_mask_trial=aspect_mask_trial,
+            desqueeze='anamorphic-desqueeze' in features)
     if 'mtp-fast' in features:
         from .features.mtp_fast import add
         add(plan)

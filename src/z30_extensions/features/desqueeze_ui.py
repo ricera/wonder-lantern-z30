@@ -62,8 +62,8 @@ import struct
 from ..assembly import constant as c, invoke as n, assemble, jump
 
 VERSION = 6
-PAGE_INDEX = 960
-TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 82, 83, 84, 90, 96
+PAGE_INDEX = 964  # Own Extensions category page (after zebra 963).
+TITLE_SLOT, ROOT_SLOT, LABEL_SLOT, MARK_SLOT, CURRENT_SLOT = 125, 126, 127, 133, 139
 NAMES = ('OFF (stock)', '1.33x', '1.5x', '1.8x', '2.0x')
 JPEG_ROW = len(NAMES)
 ROW_LABELS = NAMES + ('Desqueeze JPEG',)
@@ -118,8 +118,8 @@ OUTPUT_EXPECTED = bytes.fromhex('8e4a143252f8200000eb8100')
 CAPTURE_OUTPUT_CALLERS = (0x10142967, 0x10142C23, 0x101432DF, 0x1014339D, 0x101435FB)
 JPEG_AREAS = (0, 2, 4)  # DX, 16:9, 1:1
 
-SIZES = dict(bitrate_get=96, bitrate_labels=320, bitrate_open=160, bitrate_action=192,
-             bitrate_restore=64, dsq_nv_read=48, dsq_nv_write=48, dsq_scale=192,
+SIZES = dict(desqueeze_get=96, desqueeze_labels=320, desqueeze_open=160, desqueeze_action=192,
+             desqueeze_restore=64, dsq_nv_read=48, dsq_nv_write=48, dsq_scale=192,
              dsq_state=64, dsq_mask=128, dsq_mask_original=32,
              dsq_nv_raw=48, dsq_nv_jpeg=32, dsq_nv_store=48, dsq_nv_toggle_jpeg=48)
 
@@ -200,19 +200,19 @@ def prepare(plan, f, resources, allocation_size):
         {call('dsq_nv_raw')}and r0,r0,#{NV_JPEG};orr r0,r0,r4;{call('dsq_nv_store')}pop {{r4,pc}};'''
     codes['dsq_nv_toggle_jpeg'] = f'''push {{r4,lr}};{call('dsq_nv_raw')}eor r0,r0,#{NV_JPEG};
         {call('dsq_nv_store')}pop {{r4,pc}};'''
-    codes['bitrate_get'] = f'''push {{r4,lr}};{call('get')}cmp r0,#0;beq done;
+    codes['desqueeze_get'] = f'''push {{r4,lr}};{call('get')}cmp r0,#0;beq done;
         {c('r1',state_offset)}add r0,r0,r1;done:pop {{r4,pc}};'''
     # Initialized state or 0. No allocation (get is safe from any task).
-    codes['dsq_state'] = f'''push {{r4,lr}};{call('bitrate_get')}cmp r0,#0;beq done;
+    codes['dsq_state'] = f'''push {{r4,lr}};{call('desqueeze_get')}cmp r0,#0;beq done;
         ldr r1,[r0,#{S_MAGIC}];{c('r2',STATE_MAGIC)}cmp r1,r2;it ne;movne r0,#0;
         done:pop {{r4,pc}};'''
     # Called by the framework on first menu entry / photo trigger. Idempotent,
     # so a pending relayout survives repeated restores. No SD settings.
-    codes['bitrate_restore'] = f'''push {{r4,lr}};{call('bitrate_get')}cmp r0,#0;beq done;
+    codes['desqueeze_restore'] = f'''push {{r4,lr}};{call('desqueeze_get')}cmp r0,#0;beq done;
         ldr r1,[r0,#{S_MAGIC}];{c('r2',STATE_MAGIC)}cmp r1,r2;beq done;
         movs r1,#0;str r1,[r0,#{S_PENDING}];str r1,[r0,#{S_FORCED}];dmb ish;str r2,[r0,#{S_MAGIC}];
         done:movs r0,#0;pop {{r4,pc}};'''
-    codes['bitrate_labels'] = f'''push {{r4-r6,lr}};
+    codes['desqueeze_labels'] = f'''push {{r4-r6,lr}};
         {c('r0',strings['title'])}movs r1,#{TITLE_SLOT};movs r2,#0;{call('text')}
         {c('r0',strings['title'])}movs r1,#{ROOT_SLOT};movs r2,#0;{call('text')}
         {call('dsq_nv_read')}mov r4,r0;
@@ -226,18 +226,18 @@ def prepare(plan, f, resources, allocation_size):
         jpeg_put:movs r1,#{MARK_SLOT + JPEG_ROW};movs r2,#0;{call('text')}
         {c('r0',labels)}ldr r0,[r0,r4,lsl #2];movs r1,#{CURRENT_SLOT};movs r2,#0;{call('text')}
         movs r0,#0;pop {{r4-r6,pc}};'''
-    codes['bitrate_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
+    codes['desqueeze_open'] = f'''push {{r4,lr}};{call('ensure')}cmp r0,#0;beq done;
         movs r0,#2;{c('r1',PAGE_INDEX)}{n(0x1045f732)}
         {call('dsq_nv_read')}mov r4,r0;
         {call('get')}{c('r1',page_offset)}add r0,r0,r1;
         DSQ_IDS;ldr r1,[r1,r4,lsl #2];{n(0x1045d54c)}
         done:movs r0,#0;pop {{r4,pc}};'''
-    codes['bitrate_action'] = f'''push {{r4-r6,lr}};mov r4,r0;
+    codes['desqueeze_action'] = f'''push {{r4-r6,lr}};mov r4,r0;
         ldrh r5,[r4,#22];ldrh r0,[r4,#24];add r5,r5,r0;cmp r5,#{JPEG_ROW};bhi done;bne factor;
         {call('dsq_nv_toggle_jpeg')}b root;
         factor:{call('dsq_nv_read')}mov r6,r0;
         mov r0,r5;{call('dsq_nv_write')}
-        cmp r5,r6;beq root;{call('bitrate_restore')}{call('dsq_state')}cbz r0,root;
+        cmp r5,r6;beq root;{call('desqueeze_restore')}{call('dsq_state')}cbz r0,root;
         movs r1,#1;dmb ish;str r1,[r0,#{S_PENDING}];
         root:movs r0,#2;movw r1,#955;{n(0x1045f732)}
         done:movs r0,#0;pop {{r4-r6,pc}};'''
@@ -404,7 +404,7 @@ def finish(plan, f, extension, identifiers):
     if len(identifiers) != len(ROW_LABELS):
         raise ValueError('Desqueeze page needs one control per factor')
     ids = plan.alloc(struct.pack(f'<{len(identifiers)}I', *identifiers))
-    extension['codes']['bitrate_open'] = extension['codes']['bitrate_open'].replace('DSQ_IDS;', c('r1', ids))
+    extension['codes']['desqueeze_open'] = extension['codes']['desqueeze_open'].replace('DSQ_IDS;', c('r1', ids))
     for name, source in extension['codes'].items():
         plan.put(f[name], assemble(source, f[name], extension['sizes'][name]))
     plan.features['desqueeze'] = dict(

@@ -8,7 +8,7 @@ import sys
 import threading
 from pathlib import Path
 
-from .build import PRESETS, resolve_presets
+from .build import PRESETS, FULL_FEATURES, resolve_presets
 from .cli import PRESET_LABELS, build_to_files
 from .container import CONTAINER_SHA256, CONTAINER_SIZE
 
@@ -27,6 +27,7 @@ PRESET_LABELS_EN = {
     'aspect-profiles': 'Custom photo aspect ratios with a translucent mask, keeps stock grid',
     'photo-zebra': 'Zebra pattern in photo live view, with its own switch',
     'wifi-5ghz': 'Wi-Fi 5 GHz region unlock; all valid profiles request US/-1, included in full',
+    'anamorphic-desqueeze': 'Experimental anamorphic desqueeze: live view, photo previews, optional JPEG; not in full, not yet combinable with aspect profiles',
 }
 
 TEXT = {
@@ -171,7 +172,8 @@ def main(argv=None):
             if name != 'full':
                 box.configure(state='disabled' if full else 'normal')
                 if full:
-                    checks[name].set(True)
+                    # full covers FULL_FEATURES only; opt-in presets stay unticked.
+                    checks[name].set(name in FULL_FEATURES)
         chosen = selected_presets({name: var.get() for name, var in checks.items()})
         enabled = resolve_presets(chosen)[1] if chosen else []
         enabled_var.set(text['enabled'].format(', '.join(enabled) or text['none']))

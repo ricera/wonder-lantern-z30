@@ -94,7 +94,7 @@ def main():
         functions = {k: int(v, 16) & ~1 for k, v in feature['functions'].items()}
         site = int(feature['site'], 16)
         jump_ok = session.remote.memory(site, 10) != bytes.fromhex(feature['site_displaced'])
-        session.input(functions['bitrate_open'], [])
+        session.input(functions['desqueeze_open'], [])
         session.run_for(1)
         page = current()
         assert int.from_bytes(session.remote.memory(page + 2, 2), 'little') == feature['page_index']
@@ -103,7 +103,7 @@ def main():
         nv = lambda: session.remote.memory(nv_address, 2)
         group_before = session.remote.memory(nv_address - 0x1E, 0x80)
         nv_boot = nv()
-        state = int(session.input(functions['bitrate_get'], [])['registers']['r0'], 16)
+        state = int(session.input(functions['desqueeze_get'], [])['registers']['r0'], 16)
         words = feature['state_words']
         row(1, '03-select-1.33x')
         assert nv() == b'\x01\xfe', f'1.33x not stored ({nv().hex()})'
@@ -117,18 +117,18 @@ def main():
         group_after = session.remote.memory(nv_address - 0x1E, 0x80)
         assert group_after[:0x1E] + group_after[0x20:] == group_before[:0x1E] + group_before[0x20:], \
             'group 0x01 neighbours changed'
-        session.input(functions['bitrate_open'], [])
+        session.input(functions['desqueeze_open'], [])
         session.run_for(1)
         frame('04-desqueeze-1.33x')
         jpeg_row = len(feature['names'])
         row(jpeg_row, '05-jpeg-on')
         assert nv() == b'\x11\xee', f'JPEG flag not set ({nv().hex()})'
-        session.input(functions['bitrate_open'], [])
+        session.input(functions['desqueeze_open'], [])
         session.run_for(1)
         frame('06-desqueeze-jpeg-on')
         row(jpeg_row, '07-jpeg-off')
         assert nv() == b'\x01\xfe', f'JPEG flag not cleared ({nv().hex()})'
-        session.input(functions['bitrate_open'], [])
+        session.input(functions['desqueeze_open'], [])
         session.run_for(1)
         row(0, '05-select-off')
         assert nv() == bytes(2), 'OFF not stored'

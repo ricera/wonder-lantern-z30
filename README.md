@@ -24,6 +24,7 @@ Wonder Lantern Z30 是 WonderLantern 组织面向 **Nikon Z30 C 1.20** 的实验
 | `aspect-profiles` | 同一菜单切换六种照片比例，包含半透明取景遮幅并保留原厂内部网格。[说明](docs/aspect-profiles.md) |
 | `photo-zebra` | 照片取景斑马纹；独立照片开关，复用原厂图案与阈值。[说明](docs/photo-zebra.md) |
 | `wifi-5ghz` | Wi-Fi 5 GHz 地区解锁：全部 22 个有效无线配置请求 US/-1，包含在 full 中，也可单独选择。 |
+| `anamorphic-desqueeze` | **实验性，需单独选择（不含在 `full` 中）。** 变形镜头还原 1.33x/1.5x/1.8x/2.0x：LCD 取景按还原比例显示、照片内嵌预览与回放还原，可选输出还原后的 JPEG。暂不可与 `aspect-profiles` 同时使用。[说明](docs/anamorphic-desqueeze.md) |
 
 `wifi-5ghz` 替换无线配置 1–10、14–25（含未保存编号的回落）的国家代码和修订号，保留各自编号字段和 12 个保留槽，不写整机销售地区或 NVRAM。原厂绕过这张表的初始化路径保持原样。原本可用 2.4 GHz 第 12、13 信道的机身可能无法再连接这些信道的网络（此为推断，尚未实测）；不等于开放全部信道，也不保证相机自身建立 5 GHz 热点、提速或实际协商带宽。驱动的有效信道与功率需适合使用地点。单独构建只需 Python 标准库。
 
@@ -84,7 +85,7 @@ python -c "from keystone import Ks; print('Keystone OK')"
 
 ### 3. 选择预设
 
-终端中省略预设时显示多选菜单：编号 **1–11** 依次为 `full` 和上表十项预设（第 **10** 项为 `photo-zebra`，第 **11** 项为 `wifi-5ghz`）。输入编号或名称，以空格或逗号分隔；直接回车选择 `full`。
+终端中省略预设时显示多选菜单：编号 **1–12** 依次为 `full` 和上表十一项预设（第 **10** 项为 `photo-zebra`，第 **11** 项为 `wifi-5ghz`，第 **12** 项为可选的 `anamorphic-desqueeze`）。输入编号或名称，以空格或逗号分隔；直接回车选择 `full`。
 
 - `2 4 5` 或 `liveview-dual,m900,mtp-fast`：同屏、M900、MTP 加速。
 - `6` 或 `module-host`：实验性模块宿主及其必需的声音框架。

@@ -18,6 +18,7 @@ PRESET_LABELS = {
     'aspect-profiles': '自定义照片画幅与半透明遮幅，保留原厂内部网格',
     'photo-zebra': '照片取景斑马纹；独立开关，复用原厂样式和阈值',
     'wifi-5ghz': 'Wi-Fi 5 GHz 地区解锁；全部有效配置请求 US/-1，包含在 full 中',
+    'anamorphic-desqueeze': '实验性变形镜头还原：取景、照片预览及可选 JPEG 横向还原；不含在 full 中，暂不可与自定义画幅同用',
 }
 
 
@@ -66,7 +67,8 @@ def main(argv=None):
     parser.add_argument('feature', nargs='*', metavar='PRESET',
                         help='Combine presets with spaces: ' + ', '.join(PRESETS) +
                              '; full enables ten features including wifi-5ghz (all valid profiles US/-1); aspect-profiles includes a translucent live-view mask; experimental module-host includes shutter-sound; '
-                             'photo-zebra includes an independent photo live-view switch; legacy alias: modular')
+                             'photo-zebra includes an independent photo live-view switch; anamorphic-desqueeze is opt-in (not in full) and '
+                             'cannot yet be combined with aspect-profiles; legacy alias: modular')
     parser.add_argument('--interactive', action='store_true', help='Prompt for presets even when stdin is redirected')
     parser.add_argument('--source', type=Path, required=True, help='Original Z_30_0120.bin, SHA-256 checked before decoding')
     parser.add_argument('--extracted-eg', action='store_true', help='Developer mode: input is an extracted stock EG module')

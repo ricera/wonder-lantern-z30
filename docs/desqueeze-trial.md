@@ -296,3 +296,11 @@ So capture was correct, and the fault was in playback setup.
 1. Play back the existing RAW+JPEG pair. It should now be desqueezed: the files already hold the right previews.
 2. Play back a plain JPEG and a JPEG at M or S size.
 3. Play back a stock photo taken while OFF. It should be unchanged.
+
+## Public preset (2026-11-01)
+
+The v6 feature is now the opt-in preset `anamorphic-desqueeze`; see [anamorphic-desqueeze.md](anamorphic-desqueeze.md).
+
+- **Menu:** it has its own Extensions category: page 964, text slots 125–139 (all of which have native buffers at boot), and functions `desqueeze_*`. It no longer borrows the experimental page 960, so it combines with bitrate profiles, photo zebra and module host.
+- **Same build:** `tools/build_desqueeze_trial.py` now builds the same image as `patch.py anamorphic-desqueeze`.
+- **aspect-profiles:** the combination is refused for now; see [desqueeze-aspect-compatibility.md](desqueeze-aspect-compatibility.md).

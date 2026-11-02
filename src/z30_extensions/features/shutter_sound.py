@@ -16,10 +16,11 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         raise ValueError('Playback probe needs the independent experimental page slot')
     if playback_probe and aspect:
         raise ValueError('Playback probe observes stock geometry; build it without aspect-profiles')
-    if desqueeze and (desqueeze_probe or wireless or bitrate or precapture_probe or lut_sd):
-        raise ValueError('Desqueeze trial needs the independent experimental page slot')
+    if desqueeze and (desqueeze_probe or playback_probe or capture_probe):
+        raise ValueError('Anamorphic desqueeze observes nothing; build research probes separately')
     if desqueeze and aspect:
-        raise ValueError('Desqueeze trial is not yet validated together with aspect-profiles')
+        raise ValueError('anamorphic-desqueeze and aspect-profiles share preview, output-size and playback hooks '
+                         'and are not composed yet; see docs/desqueeze-aspect-compatibility.md')
     if desqueeze_probe and (wireless or bitrate or precapture_probe or lut_sd):
         raise ValueError('Desqueeze probe needs the independent experimental page slot')
     if desqueeze_probe and aspect:
@@ -30,7 +31,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         raise ValueError('JPG capture probe needs the independent experimental page slot')
     if wireless and bitrate:
         raise ValueError('Wireless research menu and bitrate menu currently share one owned page slot')
-    bitrate = bitrate or wireless or precapture_probe or lut_sd or desqueeze_probe or desqueeze or playback_probe or capture_probe
+    bitrate = bitrate or wireless or precapture_probe or lut_sd or desqueeze_probe or playback_probe or capture_probe
     im = plan.image
     if im.read(STATE_ANCHOR, 44) != bytes(44):
         raise ValueError('Sound state requires the unused stock page-zero slot')
@@ -52,7 +53,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
     sizes['dismiss_error'] = 96
     if aspect:
         sizes.update(ensure=1024, getter=512, route=448, row=384)
-    grouped = bool(modules or bitrate or aspect or zebra)
+    grouped = bool(modules or bitrate or aspect or zebra or desqueeze)
     if grouped:
         sizes.update(ensure=1280, getter=640, route=640, action=1280)
     f = {name: plan.alloc(bytes(size)) for name, size in sizes.items()}
@@ -66,7 +67,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
                  one='1.WAV', two='2.WAV', three='3.WAV', four='4.WAV', empty='', current='*',
                  missing='File not found', read='Read failed', invalid='Invalid WAV', close='Close failed',
                  busy='Sound busy', queue='Play failed', audio='Audio failed', ok='OK', save='Settings not saved')
-    if modules or bitrate or aspect or zebra:
+    if modules or bitrate or aspect or zebra or desqueeze:
         texts['entry'] = texts['title'] = 'Extensions'
     strings = {key: text_resources.alloc(text) for key, text in texts.items()}
     if grouped:
@@ -104,8 +105,6 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
             from . import lut_ui as bu
         elif desqueeze_probe:
             from . import desqueeze_probe as bu
-        elif desqueeze:
-            from . import desqueeze_ui as bu
         elif playback_probe:
             from . import playback_probe as bu
         elif capture_probe:
@@ -151,11 +150,22 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
                          if video else extension['allocation_size'] if extension else NEW_SIZE)
         zebra_extension = zu.prepare(plan, f, text_resources, previous_size)
         zebra_extension['template'] = child_templates[zu.PAGE_INDEX]
+    desqueeze_extension = None
+    if desqueeze:
+        from . import desqueeze_ui as du
+        tables[du.PAGE_INDEX], metas[du.PAGE_INDEX] = plan.alloc(bytes(32)), plan.alloc(bytes(28))
+        child_templates[du.PAGE_INDEX] = plan.alloc(struct.pack('<11I',
+            (du.PAGE_INDEX << 16) | 2, 0, 0, 0, tables[du.PAGE_INDEX], 0, 0, 0, 0, 0, metas[du.PAGE_INDEX]))
+        previous_size = (zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect
+                         else video['allocation_size'] if video else extension['allocation_size'] if extension else NEW_SIZE)
+        desqueeze_extension = du.prepare(plan, f, text_resources, previous_size)
+        desqueeze_extension['template'] = child_templates[du.PAGE_INDEX]
     group = None
     if grouped:
-        order = [key for key, enabled in (('aspect', aspect), ('zebra', zebra), ('bitrate', bitrate),
-                                          ('sound', True), ('modules', modules)) if enabled]
-        previous_size = (zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect else video['allocation_size']
+        order = [key for key, enabled in (('aspect', aspect), ('desqueeze', desqueeze), ('zebra', zebra),
+                                          ('bitrate', bitrate), ('sound', True), ('modules', modules)) if enabled]
+        previous_size = (desqueeze_extension['allocation_size'] if desqueeze else
+                         zebra_extension['allocation_size'] if zebra else aspect_extension['allocation_size'] if aspect else video['allocation_size']
                          if video else extension['allocation_size'])
         tables[SOUND_GROUP_INDEX] = plan.alloc(bytes(32))
         metas[SOUND_GROUP_INDEX] = plan.alloc(bytes(28))
@@ -168,6 +178,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         if aspect:
             aspect_extension['root_row'] = order.index('aspect')
             group['labels']['aspect'], group['values']['aspect'] = au.ROOT_SLOT, au.CURRENT_SLOT
+        if desqueeze:
+            desqueeze_extension['root_row'] = order.index('desqueeze')
+            group['labels']['desqueeze'], group['values']['desqueeze'] = du.ROOT_SLOT, du.CURRENT_SLOT
         if zebra:
             zebra_extension['root_row'] = order.index('zebra')
             group['labels']['zebra'], group['values']['zebra'] = zu.ROOT_SLOT, zu.CURRENT_SLOT
@@ -184,7 +197,7 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
     codes.update(settings_code(f, config_path))
     codes.update(ui_code(f, strings, fixed, file_names, errors, file_ids, switch_ids,
                          anchor_table, template, child_templates, extension, sidebar_parent=setup_parent,
-                         video=video, aspect=aspect_extension, zebra=zebra_extension, group=group))
+                         video=video, aspect=aspect_extension, zebra=zebra_extension, desqueeze=desqueeze_extension, group=group))
     c = constant
     call = lambda name: invoke(f[name])
     owned_pages = [PAGE_INDEX, FILES_INDEX, SWITCH_INDEX, POPUP_INDEX]
@@ -196,6 +209,8 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         owned_pages.append(au.PAGE_INDEX)
     if zebra:
         owned_pages.append(zu.PAGE_INDEX)
+    if desqueeze:
+        owned_pages.append(du.PAGE_INDEX)
     if grouped:
         owned_pages.append(SOUND_GROUP_INDEX)
     codes['row'] = ui_text.row_code(f, SETUP_OBJECT, ENTRY_ID, owned_pages)
@@ -304,8 +319,8 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         root = page_specs[0]
         page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[3],))
         # Wireless research uses four choices, while the video selector has three.
-        choice_count = len(bu.ROW_LABELS) if desqueeze else 4 if wireless or lut_sd else 3
-        if wireless or lut_sd or desqueeze:
+        choice_count = 4 if wireless or lut_sd else 3
+        if wireless or lut_sd:
             occupied = used | {ident for spec in page_specs for ident in spec[-1]}
             choices = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:choice_count]
             if len(choices) != choice_count:
@@ -334,6 +349,17 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[2],))
         page_specs.append((zu.PAGE_INDEX,2,zu.LABEL_SLOT,zu.MARK_SLOT,zu.TITLE_SLOT,ids[:2]))
         zu.finish(plan,f,zebra_extension,ids[:2])
+    if desqueeze:
+        rows = len(du.ROW_LABELS)
+        occupied = used | {ident for spec in page_specs for ident in spec[-1]}
+        ids = tuple(i for i in range(0x2400,0x3000) if i not in occupied)[:rows + 1]
+        if len(ids) != rows + 1:
+            raise ValueError('No free desqueeze control IDs')
+        category_ids['desqueeze'] = ids[rows]
+        root = page_specs[0]
+        page_specs[0] = (root[0],root[1]+1,*root[2:5],root[5]+(ids[rows],))
+        page_specs.append((du.PAGE_INDEX,rows,du.LABEL_SLOT,du.MARK_SLOT,du.TITLE_SLOT,ids[:rows]))
+        du.finish(plan,f,desqueeze_extension,ids[:rows])
     if grouped:
         occupied = used | {ident for spec in page_specs for ident in spec[-1]}
         category_ids['sound'] = next(i for i in range(0x2400,0x3000) if i not in occupied)
@@ -424,9 +450,9 @@ def add(plan, modules=False, bitrate=False, aspect=False, zebra=False, wireless=
         'pages': pages, 'state_anchor': hex(STATE_ANCHOR + 16), 'anchor_table': hex(anchor_table),
         'page_template': hex(template), 'persistent_state_size': (group['allocation_size'] if grouped else NEW_SIZE) + 31,
         'root_parent': hex(setup_parent),
-        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **({str(mh.PAGE_INDEX): mh.PAGE_OFFSET} if modules else {}), **({str(bu.PAGE_INDEX):video['page_offset']} if video else {}), **({str(au.PAGE_INDEX):aspect_extension['page_offset']} if aspect else {}), **({str(zu.PAGE_INDEX):zebra_extension['page_offset']} if zebra else {}), **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
+        'page_offsets': {str(PAGE_INDEX): PAGE_OFFSET, str(FILES_INDEX): FILES_OFFSET, str(SWITCH_INDEX): SWITCH_OFFSET, str(POPUP_INDEX): POPUP_OFFSET, **({str(mh.PAGE_INDEX): mh.PAGE_OFFSET} if modules else {}), **({str(bu.PAGE_INDEX):video['page_offset']} if video else {}), **({str(au.PAGE_INDEX):aspect_extension['page_offset']} if aspect else {}), **({str(zu.PAGE_INDEX):zebra_extension['page_offset']} if zebra else {}), **({str(du.PAGE_INDEX):desqueeze_extension['page_offset']} if desqueeze else {}), **({str(SOUND_GROUP_INDEX):group['page_offset']} if grouped else {})},
         'menu_categories': ([dict(key=key,row=row,control_id=category_ids[key],
-                                  page_index={'zebra':963,'aspect':961,'bitrate':960,'sound':SOUND_GROUP_INDEX,'modules':958}[key])
+                                  page_index={'zebra':963,'desqueeze':964,'aspect':961,'bitrate':960,'sound':SOUND_GROUP_INDEX,'modules':958}[key])
                              for row,key in enumerate(group['order'])] if grouped else []),
         'sound_settings_page': SOUND_GROUP_INDEX if grouped else PAGE_INDEX,
         'control_identifiers': {str(index): list(identifiers) for index, _, _, _, _, identifiers in page_specs},

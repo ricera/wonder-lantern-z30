@@ -46,6 +46,8 @@ def main():
     p.add_argument('--source', type=Path, required=True)
     p.add_argument('--deps', type=Path)
     p.add_argument('--output', type=Path)
+    p.add_argument('--presets', nargs='+', default=['anamorphic-desqueeze'],
+                   help='Verify the image composed from these presets (must include anamorphic-desqueeze)')
     a = p.parse_args()
     if a.deps:
         sys.path.insert(0, str(a.deps.resolve()))
@@ -53,12 +55,14 @@ def main():
     from unicorn.arm_const import UC_ARM_REG_LR, UC_ARM_REG_PC, UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R3
     from native_runtime import Context, STOP
     from verify_sound_settings import Fixture
-    from build_desqueeze_trial import build
+    from z30_extensions.build import build as build_presets
     from z30_extensions.container import extract_eg
     from z30_extensions.features import desqueeze_ui as du
 
     stock = extract_eg(a.source.read_bytes())
-    image, report = build(stock)
+    if 'anamorphic-desqueeze' not in a.presets:
+        p.error('--presets must include anamorphic-desqueeze')
+    image, report = build_presets(stock, a.presets)
     info = report['features']['desqueeze']
     fn = {k: int(v, 16) for k, v in info['functions'].items()}
     files = {}
@@ -184,11 +188,11 @@ def main():
     sw = lambda off: int.from_bytes(trial.u.mem_read(trial.state + info['state_offset'] + off, 4), 'little')
     sput = lambda off, v: trial.u.mem_write(trial.state + info['state_offset'] + off, struct.pack('<I', v))
     sput(du.S_MAGIC, 0)
-    trial.call(fn['bitrate_restore'])
+    trial.call(fn['desqueeze_restore'])
     check('restore initializes relayout state', sw(du.S_MAGIC) == du.STATE_MAGIC and
           sw(du.S_PENDING) == 0 and sw(du.S_FORCED) == 0)
     sput(du.S_PENDING, 1)
-    trial.call(fn['bitrate_restore'])
+    trial.call(fn['desqueeze_restore'])
     check('restore keeps a pending relayout', sw(du.S_PENDING) == 1)
 
     def stub_property(u, address, size, data):  # 0x10188776: native property read (not modelled).

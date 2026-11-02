@@ -1,4 +1,4 @@
-"""Build the desqueeze trial EG: menu framework plus LCD live-view desqueeze.
+"""Build the anamorphic-desqueeze EG (identical to the public preset).
 
 The image contains only the shared Extensions menu framework (shutter sound,
 default off) and the Extensions -> Desqueeze factor page (default OFF). It deliberately
@@ -13,15 +13,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
 
 def build(stock):
-    from z30_extensions.plan import Plan
-    from z30_extensions.features.shutter_sound import add
-    plan = Plan(stock)
-    add(plan, desqueeze=True)
-    image, report = plan.finish()
-    report.update(preset='desqueeze-trial', diagnostic_only=False, research=True,
-                  enabled_features=['shutter-sound-menu-framework', 'desqueeze-trial'],
-                  includes_full_features=False)
-    return image, report
+    """Same image as `patch.py anamorphic-desqueeze` (the public preset)."""
+    from z30_extensions.build import build as build_preset
+    return build_preset(stock, 'anamorphic-desqueeze')
 
 
 def main():
