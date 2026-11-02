@@ -70,5 +70,12 @@ class DesqueezeUiLayoutTests(unittest.TestCase):
         self.assertEqual(du.ROW_LABELS[du.JPEG_ROW], 'Desqueeze JPEG')
 
 
+    def test_movie_poster_preview_index_stays_stock(self):
+        from z30_extensions.plan import Plan
+        self.assertEqual(du.STOCK_PREVIEW_INDICES, (1,))
+        self.assertEqual(du.STOCK_LARGE[1], (1920, 1080))
+        self.assertEqual(du.STOCK_SMALL[1], (640, 360))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -288,6 +288,9 @@ def main():
             select(factor)
             for index in range(5):
                 out = produce(trial, address, index)
+                if index in du.STOCK_PREVIEW_INDICES:  # movie poster previews (16:9) stay stock
+                    check(f'producer {address:#x} f{factor} i{index} movie/16:9 stock', out == stock_out[index])
+                    continue
                 if not factor:
                     check(f'producer {address:#x} OFF i{index} stock', out == stock_out[index])
                     continue

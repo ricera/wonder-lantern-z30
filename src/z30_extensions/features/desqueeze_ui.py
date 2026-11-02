@@ -32,7 +32,8 @@ into the mask and clears the flag, so the new factor is laid out without a
 photo <-> movie switch. At boot no extension state exists and nothing is
 forced (the first native layout already reads the stored factor).
 
-v4 desqueezed photo previews: while a factor is stored, the two JPEG previews
+v4 desqueezed photo previews (v7: except preview index 1, which movie
+poster frames share): while a factor is stored, the two JPEG previews
 generated at capture (small 640-class and large 1620/1920-class, embedded in
 the file and shown by normal single-frame playback) keep their stock width
 and get their height divided by the factor, so the full frame is scaled
@@ -100,6 +101,7 @@ STATE_BYTES = 20
 PREVIEW_SMALL, PREVIEW_LARGE = (0x1020C02E, 0x115A4CFC), (0x1020C038, 0x115A4D10)
 STOCK_SMALL = ((640, 424), (640, 360), (600, 480), (640, 480), (480, 480))
 STOCK_LARGE = ((1620, 1080), (1920, 1080), (1350, 1080), (1440, 1080), (1080, 1080))
+STOCK_PREVIEW_INDICES = (1,)  # 16:9: shared with movie poster previews.
 # Stock photo shapes per image area (JPEG L, M, S). install() adds the padded
 # RAW plane of each L size. Playback file types: 0 JPEG, 1/2 NEF (0x103A1FA8
 # serves all three; 4/5 are movies).
@@ -337,8 +339,13 @@ def install_preview(plan, f, codes, sizes, call, last):
     if (struct.unpack_from('<10H', span, 0) != tuple(v for wh in STOCK_SMALL for v in wh) or
             struct.unpack_from('<10H', span, 40) != tuple(v for wh in STOCK_LARGE for v in wh)):
         raise ValueError('Unexpected direct preview producer span')
-    small = [desqueezed(STOCK_SMALL, k) for k in FACTORS]
-    large = [desqueezed(STOCK_LARGE, k) for k in FACTORS]
+    # Preview index 1 (16:9) stays stock: movie poster previews use it, and
+    # movie playback decodes them into fixed 1920x1080 / 640x360 buffers
+    # (0x103472DE), so a shorter poster shows uninitialized rows. 16:9-area
+    # photos therefore keep stock previews too (camera report 2026-11-01).
+    keep = lambda pairs, stock: tuple(stock[i] if i in STOCK_PREVIEW_INDICES else wh for i, wh in enumerate(pairs))
+    small = [keep(desqueezed(STOCK_SMALL, k), STOCK_SMALL) for k in FACTORS]
+    large = [keep(desqueezed(STOCK_LARGE, k), STOCK_LARGE) for k in FACTORS]
     pack = lambda pairs: b''.join(struct.pack('<2H', *wh) for wh in pairs)
     getter_tables = {}
     for kind, pairs in (('small', small), ('large', large)):

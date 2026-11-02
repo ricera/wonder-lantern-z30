@@ -31,6 +31,18 @@ Settings:
 
 With Desqueeze JPEG on, the full-size JPEG embedded in a NEF is also desqueezed. The raw image itself is not.
 
+## Known limitation: 16:9 previews stay stock
+
+On the composed test build (`f49b2682…`), recording a movie with 1.33x set showed the movie's playback preview (the poster frame) with its bottom quarter corrupted. The video itself played clean and squeezed.
+
+**Cause:** the poster preview uses preview index 1 (16:9), which had been desqueezed to 1920×808. Movie playback (`0x103472DE`, file types 4/5) always decodes posters into fixed 1920×1080 / 640×360 buffers. The 808 decoded rows leave the rest of the buffer uninitialized. Nothing overflows, and the embedded JPEG is valid.
+
+**Fix:** preview index 1 now stays stock. Movie posters are correct again, while DX (index 0) and 1:1 (index 4) photo previews are still desqueezed.
+
+- **Side effect:** photos shot in the **16:9 image area** keep a stock preview and play back squeezed. With Desqueeze JPEG on, their main JPEG is still desqueezed.
+- **Existing clips:** movies recorded with the earlier build keep their 1920×808 poster.
+- **Possible refinement:** a probe that separates the movie-poster path from 16:9 photo capture could restore 16:9 photo previews.
+
 ## Camera verification (Z30 C 1.20, 2026-11-01)
 
 - **Live view:** desqueezed in photo and movie; persists across a power cycle; applies immediately on returning from the menu; touch AF behaves correctly.
